@@ -4,8 +4,9 @@ const nextConfig = {
     remotePatterns: [],
     unoptimized: process.env.NODE_ENV === 'development',
   },
-  // Avoid next-auth vendor chunk resolution issues
-  serverExternalPackages: ['next-auth'],
+  experimental: {
+    serverComponentsExternalPackages: ['next-auth'],
+  },
 };
 
 module.exports = nextConfig;

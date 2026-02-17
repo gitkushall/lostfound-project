@@ -27,7 +27,7 @@ export default async function ItemChatPage({
       { user1Id: session.user?.id },
       { user2Id: session.user?.id },
     ],
-  } as const;
+  };
 
   const conv = conversationId
     ? await prisma.conversation.findFirst({
