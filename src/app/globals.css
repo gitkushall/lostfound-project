@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #21201F;
+  --card: #ffffff;
+  --muted: #6b7280;
+  --brand: #F06122;
+  --brand-hover: #d9541a;
+  --wpu-black: #21201F;
+  --wpu-orange: #F06122;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  min-height: 100vh;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

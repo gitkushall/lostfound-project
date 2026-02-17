@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                        String    @id @default(cuid())
+  name                      String
+  email                     String    @unique
+  passwordHash              String
+  emailVerified             Boolean   @default(false)
+  verificationCode         String?
+  verificationCodeExpiresAt DateTime?
+  profilePhotoUrl           String?
+  bio                       String?
+  role                      String    @default("USER")
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @default(now()) @updatedAt
+
+  itemPosts       ItemPost[]
+  claimRequests   ClaimRequest[]
+  notifications  Notification[]
+  infoUpdates     ItemInfoUpdate[]
+  conversationsAsUser1 Conversation[] @relation("User1")
+  conversationsAsUser2 Conversation[] @relation("User2")
+  messages        Message[]
+  messageReactions MessageReaction[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model ItemPost {
+  id             String   @id @default(cuid())
+  type           String   // LOST | FOUND
+  title          String
+  description    String?
+  category       String
+  locationText   String
+  dateOccurred   DateTime
+  photoUrl       String?
+  status         String   @default("OPEN")
+  postedByUserId String
+  createdAt      DateTime @default(now())
+
+  postedBy       User             @relation(fields: [postedByUserId], references: [id], onDelete: Cascade)
+  claimRequests  ClaimRequest[]
+  infoUpdates    ItemInfoUpdate[]
+  conversations  Conversation[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ClaimRequest {
+  id                  String   @id @default(cuid())
+  itemId              String
+  requesterUserId     String
+  message             String?
+  verificationAnswers String?
+  status              String   @default("PENDING")
+  createdAt           DateTime @default(now())
+
+  item     ItemPost @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  requester User    @relation(fields: [requesterUserId], references: [id], onDelete: Cascade)
+}
+
+// LOST items only: "I have seen this item" / "Returned to information desk"
+model ItemInfoUpdate {
+  id         String   @id @default(cuid())
+  itemId     String
+  userId     String
+  type       String   // SEEN | RETURNED_TO_DESK
+  message    String?
+  createdAt  DateTime @default(now())
+
+  item ItemPost @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  itemId    String
+  user1Id   String
+  user2Id   String
+  createdAt DateTime @default(now())
+
+  item  ItemPost @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user1 User     @relation("User1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2 User     @relation("User2", fields: [user2Id], references: [id], onDelete: Cascade)
+  messages Message[]
+}
+
+model Message {
+  id               String   @id @default(cuid())
+  conversationId String
+  senderId         String
+  body             String
+  imageUrl         String?
+  replyToMessageId String?
+  createdAt        DateTime @default(now())
+
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  reactions      MessageReaction[]
+  replyTo        Message?          @relation("MessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies        Message[]         @relation("MessageReply")
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String   // e.g. "👍", "❤️", "😂"
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  data      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
