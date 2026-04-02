@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 const INACTIVE_DAYS = 30;
+export const dynamic = "force-dynamic";
 
 /**
  * Auto-delete posts that have had no claim activity for 30+ days.

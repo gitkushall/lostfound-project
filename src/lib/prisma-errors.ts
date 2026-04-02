@@ -11,8 +11,16 @@ type ApiError = {
 
 export function getPrismaApiError(error: unknown): ApiError | null {
   if (error instanceof PrismaClientInitializationError) {
+    const message = typeof error.message === "string" ? error.message : "";
+    const isConnectionRefused =
+      message.includes("Can't reach database server") ||
+      message.includes("P1001") ||
+      message.includes("localhost:5432");
+
     return {
-      message: "Database connection failed. Check your PostgreSQL DATABASE_URL and DIRECT_URL configuration.",
+      message: isConnectionRefused
+        ? "Can't connect to PostgreSQL at localhost:5432. Start Postgres locally or update DATABASE_URL in .env to a reachable PostgreSQL database."
+        : "Database connection failed. Check your PostgreSQL DATABASE_URL configuration.",
       status: 503,
     };
   }

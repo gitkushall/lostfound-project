@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 type Item = {
   id: string;
   type: string;
@@ -20,9 +22,11 @@ export function ItemCard({ item }: { item: Item }) {
     <article className="overflow-hidden rounded-xl border border-wpu-black/10 bg-white shadow-sm transition-shadow hover:shadow-md">
       <div className="aspect-[4/3] bg-wpu-gray-light">
         {item.photoUrl ? (
-          <img
+          <Image
             src={item.photoUrl}
-            alt=""
+            alt={item.title}
+            width={640}
+            height={480}
             className="h-full w-full object-cover"
           />
         ) : (

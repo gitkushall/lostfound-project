@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import Image from "next/image";
 
 export default async function UserProfilePage({
   params,
@@ -32,7 +33,13 @@ export default async function UserProfilePage({
         <div className="flex items-start gap-4">
           <div className="h-20 w-20 overflow-hidden rounded-full border-2 border-wpu-black/10 bg-wpu-gray-light">
             {user.profilePhotoUrl ? (
-              <img src={user.profilePhotoUrl} alt="" className="h-full w-full object-cover" />
+              <Image
+                src={user.profilePhotoUrl}
+                alt={`${user.name}'s profile photo`}
+                width={80}
+                height={80}
+                className="h-full w-full object-cover"
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-wpu-black/50">
                 {user.name.charAt(0).toUpperCase()}

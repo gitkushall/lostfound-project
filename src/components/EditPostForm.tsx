@@ -179,6 +179,7 @@ export function EditPostForm({
         </div>
         {photoUrl && (
           <div className="mt-3 relative inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={photoUrl}
               alt="Preview"

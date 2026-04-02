@@ -109,6 +109,7 @@ export function ProfileClient({
           <div className="mt-2 flex items-center gap-4">
             <div className="h-24 w-24 overflow-hidden rounded-full border-2 border-wpu-black/10 bg-wpu-gray-light">
               {(profilePhotoUrl || profile?.profilePhotoUrl) ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={profilePhotoUrl || profile?.profilePhotoUrl || ""}
                   alt=""

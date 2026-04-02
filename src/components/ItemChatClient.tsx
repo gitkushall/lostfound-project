@@ -80,7 +80,7 @@ export function ItemChatClient({
       })
       .catch(() => setConv(null))
       .finally(() => setLoading(false));
-  }, [itemId, initialConv?.id]);
+  }, [itemId, initialConv]);
 
   useEffect(() => {
     if (!conv?.id) return;
@@ -203,6 +203,7 @@ export function ItemChatClient({
           <Link href={`/user/${otherUser?.id ?? ""}`} className="flex items-center gap-2 rounded-lg hover:bg-wpu-orange-light/50">
             <div className="h-10 w-10 overflow-hidden rounded-full border border-wpu-black/20 bg-wpu-gray-light">
               {otherUser?.profilePhotoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={otherUser.profilePhotoUrl} alt="" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-lg font-bold text-wpu-black/50">
@@ -251,6 +252,7 @@ export function ItemChatClient({
                   )}
                   {m.imageUrl && (
                     <a href={m.imageUrl} target="_blank" rel="noopener noreferrer" className="block mt-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={m.imageUrl} alt="" className="max-h-48 rounded-lg object-cover" />
                     </a>
                   )}

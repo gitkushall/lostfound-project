@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 type Item = {
   id: string;
@@ -144,9 +145,11 @@ export function ItemDetailClient({
       <div className="overflow-hidden rounded-2xl border border-wpu-black/10 bg-white shadow-sm">
         <div className="aspect-video bg-wpu-gray-light">
           {item.photoUrl ? (
-            <img
+            <Image
               src={item.photoUrl}
-              alt=""
+              alt={item.title}
+              width={1280}
+              height={720}
               className="h-full w-full object-cover"
             />
           ) : (

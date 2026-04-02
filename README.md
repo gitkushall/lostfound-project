@@ -30,10 +30,10 @@ A campus/community platform to report, search, and claim lost items.
 
    ```bash
    cp .env.example .env
-   # Edit .env: set DATABASE_URL, DIRECT_URL, and NEXTAUTH_SECRET
+   # Edit .env: set DATABASE_URL and NEXTAUTH_SECRET
    ```
 
-3. Start PostgreSQL and create a database named `lostfound`, or point `DATABASE_URL` and `DIRECT_URL` at a hosted Postgres database.
+3. Start PostgreSQL and create a database named `lostfound`, or point `DATABASE_URL` at a hosted Postgres database.
 
 4. Initialize the database:
 
@@ -63,7 +63,7 @@ A campus/community platform to report, search, and claim lost items.
 ## Vercel deployment
 
 1. Provision a hosted PostgreSQL database.
-2. Set `DATABASE_URL` and `DIRECT_URL` in Vercel for the project.
+2. Set `DATABASE_URL` in Vercel for the project.
 3. Set the Vercel Build Command to:
 
    ```bash

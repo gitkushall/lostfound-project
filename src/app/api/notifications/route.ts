@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getPrismaApiError } from "@/lib/prisma-errors";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -15,8 +16,13 @@ export async function GET() {
       take: 50,
     });
     return NextResponse.json(notifications);
-  } catch (e) {
-    console.error(e);
+  } catch (error) {
+    const prismaError = getPrismaApiError(error);
+    if (prismaError) {
+      return NextResponse.json({ error: prismaError.message }, { status: prismaError.status });
+    }
+
+    console.error(error);
     return NextResponse.json({ error: "Failed to fetch notifications" }, { status: 500 });
   }
 }

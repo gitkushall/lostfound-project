@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 type Item = {
   id: string;
@@ -76,9 +77,11 @@ export function MyPostsClient({ items }: { items: Item[] }) {
               <div className="flex gap-4">
                 <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-wpu-gray-light">
                   {item.photoUrl ? (
-                    <img
+                    <Image
                       src={item.photoUrl}
-                      alt=""
+                      alt={item.title}
+                      width={80}
+                      height={80}
                       className="h-full w-full object-cover"
                     />
                   ) : (
