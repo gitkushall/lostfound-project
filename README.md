@@ -15,7 +15,7 @@ A campus/community platform to report, search, and claim lost items.
 
 - **Frontend**: Next.js 14 (App Router), React, Tailwind CSS
 - **Backend**: Next.js API routes
-- **Database**: SQLite with Prisma
+- **Database**: PostgreSQL with Prisma
 - **Auth**: NextAuth.js (Credentials + JWT)
 
 ## Setup
@@ -30,30 +30,47 @@ A campus/community platform to report, search, and claim lost items.
 
    ```bash
    cp .env.example .env
-   # Edit .env: set NEXTAUTH_SECRET (e.g. run: openssl rand -base64 32)
+   # Edit .env: set DATABASE_URL, DIRECT_URL, and NEXTAUTH_SECRET
    ```
 
-3. Initialize the database:
+3. Start PostgreSQL and create a database named `lostfound`, or point `DATABASE_URL` and `DIRECT_URL` at a hosted Postgres database.
+
+4. Initialize the database:
 
    ```bash
    npx prisma generate
-   npx prisma db push
+   npx prisma migrate dev --name init
    ```
 
-4. Run the dev server:
+5. Run the dev server:
 
    ```bash
    npm run dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000). Sign up, then use Home / Post / My Posts / Notifications / Profile.
+6. Open [http://localhost:3000](http://localhost:3000). Sign up, then use Home / Post / My Posts / Notifications / Profile.
 
 ## Scripts
 
 - `npm run dev` — start dev server
 - `npm run build` — production build
+- `npm run vercel-build` — apply Prisma migrations, then build for Vercel
 - `npm run start` — start production server
+- `npm run db:migrate` — create and apply a local migration
+- `npm run db:deploy` — apply committed migrations in deployment environments
 - `npm run db:studio` — open Prisma Studio for the database
+
+## Vercel deployment
+
+1. Provision a hosted PostgreSQL database.
+2. Set `DATABASE_URL` and `DIRECT_URL` in Vercel for the project.
+3. Set the Vercel Build Command to:
+
+   ```bash
+   npm run vercel-build
+   ```
+
+4. Redeploy so Prisma migrations run before the Next.js build.
 
 ## Auto-delete inactive posts (30-day rule)
 
