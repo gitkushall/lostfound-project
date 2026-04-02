@@ -3,7 +3,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 
 const mainLinks = [
@@ -20,9 +19,13 @@ const menuLinks = [
   { href: "/contact", label: "Contact Information" },
 ];
 
-export function Nav() {
+type NavProps = {
+  isLoggedIn: boolean;
+  userId: string | null;
+};
+
+export function Nav({ isLoggedIn, userId }: NavProps) {
   const pathname = usePathname();
-  const { data: session, status } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -36,22 +39,20 @@ export function Nav() {
   }, [menuOpen]);
 
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!userId) return;
     fetch("/api/notifications/count")
       .then((r) => r.json())
       .then((data) => setNotificationCount(data.count ?? 0))
       .catch(() => {});
-  }, [session?.user?.id, pathname]);
+  }, [userId, pathname]);
 
   useEffect(() => {
-    if (pathname === "/notifications" && session?.user?.id) {
+    if (pathname === "/notifications" && userId) {
       fetch("/api/notifications/read-all", { method: "PATCH" }).then(() => {
         setNotificationCount(0);
       });
     }
-  }, [pathname, session?.user?.id]);
-
-  const isLoggedIn = !!session;
+  }, [pathname, userId]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 flex flex-nowrap" style={{ height: "calc(4rem + 0.5cm)" }}>
