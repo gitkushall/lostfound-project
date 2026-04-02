@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { getPrismaApiError } from "@/lib/prisma-errors";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -50,8 +51,17 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     console.error(e);
+
+    const prismaError = getPrismaApiError(e);
+    if (prismaError) {
+      return NextResponse.json(
+        { error: { _: [prismaError.message] } },
+        { status: prismaError.status }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Registration failed" },
+      { error: { _: ["Registration failed. Please try again."] } },
       { status: 500 }
     );
   }
