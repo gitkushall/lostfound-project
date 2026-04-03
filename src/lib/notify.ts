@@ -6,6 +6,18 @@ export async function createNotificationAndEmail(
   type: string,
   data: Record<string, unknown>
 ) {
+  if (!userId) {
+    return null;
+  }
+
+  if (typeof data.senderId === "string" && data.senderId === userId) {
+    return null;
+  }
+
+  if (typeof data.requesterUserId === "string" && data.requesterUserId === userId) {
+    return null;
+  }
+
   const notification = await prisma.notification.create({
     data: {
       userId,

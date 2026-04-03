@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { getValidatedSessionUser } from "@/lib/session-user";
+import { requireOwnedItem, unauthorizedResponse } from "@/lib/authorization";
+import { apiErrorResponse, invalidJsonResponse } from "@/lib/api-errors";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -32,7 +34,7 @@ export async function GET(
     return NextResponse.json(item);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to fetch item" }, { status: 500 });
+    return apiErrorResponse(e, "We couldn't load this post right now.");
   }
 }
 
@@ -42,16 +44,20 @@ export async function PATCH(
 ) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   try {
     const { id } = await params;
-    const item = await prisma.itemPost.findUnique({ where: { id } });
-    if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (item.postedByUserId !== user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { response } = await requireOwnedItem(id, user.id);
+    if (response) {
+      return response;
     }
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return invalidJsonResponse();
+    }
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -70,7 +76,7 @@ export async function PATCH(
     return NextResponse.json(updated);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to update item" }, { status: 500 });
+    return apiErrorResponse(e, "We couldn't save your changes. Please try again.");
   }
 }
 
@@ -80,14 +86,13 @@ export async function DELETE(
 ) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   try {
     const { id } = await params;
-    const item = await prisma.itemPost.findUnique({ where: { id } });
-    if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (item.postedByUserId !== user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { response } = await requireOwnedItem(id, user.id);
+    if (response) {
+      return response;
     }
     // Only the post owner can delete; allowed for both LOST and FOUND, any status.
     // Remove any notifications referencing this item so no trace remains
@@ -101,6 +106,6 @@ export async function DELETE(
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to delete item" }, { status: 500 });
+    return apiErrorResponse(e, "We couldn't delete this post. Please try again.");
   }
 }

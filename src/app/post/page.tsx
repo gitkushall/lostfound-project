@@ -12,24 +12,17 @@ export default async function PostPage() {
       <section className="rounded-3xl border border-wpu-black/10 bg-white p-6 shadow-sm">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-wpu-orange">
-            Search Existing Items
+            Search
           </p>
-          <h1 className="mt-2 text-3xl font-bold text-wpu-black">Check the feed before posting a new item</h1>
-          <p className="mt-3 text-sm leading-6 text-wpu-black/70">
-            Search by title, description, category, location, date, and status to quickly see whether
-            someone has already reported the item.
-          </p>
+          <h1 className="mt-2 text-3xl font-bold text-wpu-black">Check the feed first</h1>
         </div>
-        <div className="mt-6">
+        <div className="mt-5">
           <HomeFeed showCreateCard={false} />
         </div>
       </section>
 
       <section className="mx-auto w-full max-w-xl">
         <h2 className="text-2xl font-bold text-wpu-black">Create post</h2>
-        <p className="mt-2 text-sm text-wpu-black/70">
-          If nothing matches, add a clear post so others can help identify or return the item.
-        </p>
         <CreatePostForm categories={[...ITEM_CATEGORIES]} />
       </section>
     </div>

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { AppErrorState } from "./AppErrorState";
+import { getErrorMessage } from "@/lib/client-errors";
 
 type Notification = {
   id: string;
@@ -14,27 +16,59 @@ type Notification = {
 export function NotificationsClient() {
   const [list, setList] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadNotifications() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/notifications", { cache: "no-store" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(getErrorMessage(data, "Couldn't load notifications right now."));
+      }
+
+      setList(Array.isArray(data) ? data : []);
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Couldn't load notifications right now."));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    fetch("/api/notifications")
-      .then((r) => r.json())
-      .then((data) => {
-        setList(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    void loadNotifications();
   }, []);
 
   async function markRead(id: string) {
-    await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
-    setList((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+    setError(null);
+    try {
+      const response = await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(getErrorMessage(data, "Couldn't mark this notification as read."));
+      }
+      setList((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Couldn't mark this notification as read."));
+    }
   }
 
   async function markAllRead() {
-    await fetch("/api/notifications/read-all", { method: "PATCH" });
-    setList((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setError(null);
+    try {
+      const response = await fetch("/api/notifications/read-all", { method: "PATCH" });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(getErrorMessage(data, "Couldn't mark notifications as read."));
+      }
+      setList((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Couldn't mark notifications as read."));
+    }
   }
 
   function renderNotification(n: Notification) {
@@ -59,7 +93,7 @@ export function NotificationsClient() {
             n.isRead ? "border-wpu-black/10 bg-white" : "border-wpu-orange/30 bg-wpu-orange/10"
           }`}
         >
-          <p className="font-medium text-wpu-black">New message about an item</p>
+          <p className="font-medium text-wpu-black">New message</p>
           <p className="text-sm text-wpu-black/80">
             {data.senderName && <span className="font-medium">{data.senderName}: </span>}
             {data.messageBody ? `"${data.messageBody.slice(0, 120)}${(data.messageBody as string).length > 120 ? "…" : ""}"` : "New message"}
@@ -77,7 +111,7 @@ export function NotificationsClient() {
             n.isRead ? "border-wpu-black/10 bg-white" : "border-wpu-orange/30 bg-wpu-orange/10"
           }`}
         >
-          <p className="font-medium text-wpu-black">Someone requested your found item</p>
+          <p className="font-medium text-wpu-black">New claim</p>
           <p className="text-sm text-wpu-black/80">
             {data.requesterName} requested to claim &quot;{data.itemTitle}&quot;
           </p>
@@ -97,9 +131,9 @@ export function NotificationsClient() {
               ? "border-wpu-black/10 bg-white" : "border-wpu-orange/30 bg-wpu-orange/10"
           }`}
         >
-          <p className="font-medium text-wpu-black">Your claim was approved</p>
+          <p className="font-medium text-wpu-black">Claim approved</p>
           <p className="text-sm text-wpu-black/80">
-            &quot;{data.itemTitle}&quot; — you can arrange pickup with the poster.
+            &quot;{data.itemTitle}&quot; is ready for pickup.
           </p>
           <p className="mt-1 text-xs text-wpu-black/60">{new Date(n.createdAt).toLocaleString()}</p>
         </Link>
@@ -121,6 +155,21 @@ export function NotificationsClient() {
     );
   }
 
+  if (error && list.length === 0) {
+    return (
+      <div className="mt-6">
+        <AppErrorState
+          title="Notifications unavailable"
+          message={error}
+          actionLabel="Try again"
+          onAction={() => {
+            void loadNotifications();
+          }}
+        />
+      </div>
+    );
+  }
+
   if (list.length === 0) {
     return (
       <div className="mt-6 rounded-xl border border-dashed border-wpu-black/20 bg-wpu-gray-light py-12 text-center text-wpu-gray">
@@ -133,13 +182,18 @@ export function NotificationsClient() {
 
   return (
     <div className="mt-6 space-y-4">
+      {error ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
       {unreadCount > 0 && (
         <button
           type="button"
           onClick={markAllRead}
-          className="text-sm font-medium text-wpu-black hover:underline"
+          className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-wpu-black hover:bg-wpu-gray-light hover:underline"
         >
-          Mark all as read
+          Mark all read
         </button>
       )}
       <ul className="space-y-3">

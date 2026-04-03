@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getValidatedSessionUser } from "@/lib/session-user";
+import { getOrCreateConversationForItem } from "@/lib/conversations";
+import { unauthorizedResponse } from "@/lib/authorization";
+import { apiErrorResponse, invalidJsonResponse } from "@/lib/api-errors";
 
 export async function GET(req: NextRequest) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   const { searchParams } = new URL(req.url);
   const itemId = searchParams.get("itemId");
@@ -46,45 +49,32 @@ export async function GET(req: NextRequest) {
 export async function POST(req: Request) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   try {
-    const { itemId } = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return invalidJsonResponse();
+    }
+    const itemId =
+      body && typeof body === "object" && "itemId" in body
+        ? (body as { itemId?: unknown }).itemId
+        : undefined;
     if (!itemId) {
       return NextResponse.json({ error: "itemId required" }, { status: 400 });
     }
-    const item = await prisma.itemPost.findUnique({ where: { id: itemId } });
-    if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
-    const otherId = item.postedByUserId;
-    if (otherId === user.id) {
-      return NextResponse.json(
-        { error: "You cannot start a conversation with yourself" },
-        { status: 400 }
-      );
-    }
-    const user1Id = user.id < otherId ? user.id : otherId;
-    const user2Id = user.id < otherId ? otherId : user.id;
-    let conv = await prisma.conversation.findFirst({
-      where: { itemId, user1Id, user2Id },
-      include: {
-        item: { select: { id: true, title: true, type: true } },
-        user1: { select: { id: true, name: true, profilePhotoUrl: true } },
-        user2: { select: { id: true, name: true, profilePhotoUrl: true } },
-      },
-    });
-    if (!conv) {
-      conv = await prisma.conversation.create({
-        data: { itemId, user1Id, user2Id },
-        include: {
-          item: { select: { id: true, title: true, type: true } },
-          user1: { select: { id: true, name: true, profilePhotoUrl: true } },
-          user2: { select: { id: true, name: true, profilePhotoUrl: true } },
-        },
-      });
-    }
-    return NextResponse.json(conv);
+    const { conversation } = await getOrCreateConversationForItem(String(itemId), user.id);
+    return NextResponse.json(conversation);
   } catch (e) {
+    if (e instanceof Error && e.message === "Item not found.") {
+      return NextResponse.json({ error: e.message }, { status: 404 });
+    }
+    if (e instanceof Error && e.message === "You cannot start a conversation with yourself.") {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
     console.error(e);
-    return NextResponse.json({ error: "Failed to create conversation" }, { status: 500 });
+    return apiErrorResponse(e, "We couldn't start this conversation. Please try again.");
   }
 }

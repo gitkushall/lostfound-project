@@ -19,6 +19,7 @@ export function CreatePostForm({ categories }: { categories: string[] }) {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<Record<string, string[]> | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -26,9 +27,11 @@ export function CreatePostForm({ categories }: { categories: string[] }) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setError({ _: ["Please choose an image file (JPEG, PNG, WebP, GIF)."] });
+      setSuccessMessage(null);
       return;
     }
     setError(null);
+    setSuccessMessage(null);
     setPhotoFile(file);
     setPhotoUrl(URL.createObjectURL(file));
   }
@@ -43,6 +46,7 @@ export function CreatePostForm({ categories }: { categories: string[] }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
     setLoading(true);
     try {
       let finalPhotoUrl: string | undefined;
@@ -81,6 +85,7 @@ export function CreatePostForm({ categories }: { categories: string[] }) {
         setLoading(false);
         return;
       }
+      setSuccessMessage("Post created. Opening it now...");
       router.push(`/item/${data.id}`);
       router.refresh();
     } catch {
@@ -93,7 +98,7 @@ export function CreatePostForm({ categories }: { categories: string[] }) {
     <form onSubmit={handleSubmit} className="mt-6 space-y-6">
       <div>
         <label className="block text-sm font-medium text-wpu-black">Type</label>
-        <div className="mt-2 flex gap-4">
+        <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:gap-4">
           <label className="inline-flex items-center gap-2">
             <input
               type="radio"
@@ -191,36 +196,36 @@ export function CreatePostForm({ categories }: { categories: string[] }) {
         <p className="mt-1 text-xs text-wpu-black/70">
           Take a photo with your camera or upload from device.
         </p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 grid gap-2 sm:flex sm:flex-wrap">
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" />
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
           <button
             type="button"
             onClick={() => cameraInputRef.current?.click()}
-            className="rounded-lg border border-wpu-black/20 bg-wpu-orange px-4 py-2 text-sm font-medium text-white hover:bg-wpu-orange-hover"
+            className="min-h-[44px] rounded-lg border border-wpu-black/20 bg-wpu-orange px-4 py-2 text-sm font-medium text-white hover:bg-wpu-orange-hover"
           >
             Take photo
           </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="rounded-lg border border-wpu-black/20 px-4 py-2 text-sm font-medium text-wpu-black hover:bg-wpu-gray-light"
+            className="min-h-[44px] rounded-lg border border-wpu-black/20 px-4 py-2 text-sm font-medium text-wpu-black hover:bg-wpu-gray-light"
           >
             Upload from device
           </button>
         </div>
         {photoUrl && (
-          <div className="mt-3 relative inline-block">
+          <div className="relative mt-3 inline-block max-w-full">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={photoUrl}
               alt="Preview"
-              className="h-40 w-auto rounded-lg border border-wpu-black/10 object-cover"
+              className="h-40 max-w-full rounded-lg border border-wpu-black/10 object-cover"
             />
             <button
               type="button"
               onClick={clearPhoto}
-              className="absolute right-2 top-2 rounded-full bg-wpu-black/70 px-2 py-1 text-xs text-wpu-black hover:bg-wpu-black"
+              className="absolute right-2 top-2 min-h-[32px] rounded-full bg-wpu-black/70 px-2 py-1 text-xs text-white hover:bg-wpu-black"
             >
               Remove
             </button>
@@ -243,13 +248,18 @@ export function CreatePostForm({ categories }: { categories: string[] }) {
       </div>
 
       {error?._ && <p className="text-sm text-red-600">{error._[0]}</p>}
+      {successMessage && (
+        <p className="text-sm text-emerald-700" role="status">
+          {successMessage}
+        </p>
+      )}
 
       <button
         type="submit"
         disabled={loading || uploading}
-        className="w-full rounded-lg bg-wpu-orange py-2.5 font-medium text-white hover:bg-wpu-orange-hover disabled:opacity-50"
+        className="min-h-[48px] w-full rounded-lg bg-wpu-orange py-2.5 font-medium text-white hover:bg-wpu-orange-hover disabled:opacity-50"
       >
-        {loading || uploading ? "Creating…" : "Create post"}
+        {uploading ? "Uploading photo…" : loading ? "Creating post…" : "Create post"}
       </button>
     </form>
   );

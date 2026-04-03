@@ -1,18 +1,17 @@
 import { notFound } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import Image from "next/image";
 import { StatusBadge } from "@/components/StatusBadge";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 export default async function UserProfilePage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session) notFound();
+  const viewer = await getValidatedSessionUser();
+  if (!viewer) notFound();
   const { id } = await params;
   const user = await prisma.user.findUnique({
     where: { id },

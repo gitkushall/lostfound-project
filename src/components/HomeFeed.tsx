@@ -35,6 +35,7 @@ export function HomeFeed({ showCreateCard = true }: HomeFeedProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
 
   const deferredSearch = useDeferredValue(searchValue.trim());
@@ -54,16 +55,28 @@ export function HomeFeed({ showCreateCard = true }: HomeFeedProps) {
   useEffect(() => {
     let isCancelled = false;
     setLoading(true);
+    setLoadError(null);
 
-    fetch(`/api/items?${params}`)
-      .then((response) => response.json())
+    fetch(`/api/items?${params}`, { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            typeof data?.error === "string"
+              ? data.error
+              : "Couldn't load posts right now."
+          );
+        }
+        return data;
+      })
       .then((data) => {
         if (isCancelled) return;
         setItems(Array.isArray(data) ? data : []);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (isCancelled) return;
         setItems([]);
+        setLoadError(error instanceof Error ? error.message : "Couldn't load posts right now.");
       })
       .finally(() => {
         if (!isCancelled) setLoading(false);
@@ -103,7 +116,7 @@ export function HomeFeed({ showCreateCard = true }: HomeFeedProps) {
 
   return (
     <section className="space-y-5">
-      <div className="flex items-start gap-3">
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start">
         <div className="relative flex-1">
           <input
             type="search"
@@ -113,12 +126,12 @@ export function HomeFeed({ showCreateCard = true }: HomeFeedProps) {
               if (event.key === "Enter") applySearch();
             }}
             placeholder="Search items..."
-            className="w-full rounded-2xl border-2 border-wpu-orange/90 bg-white px-5 py-3 pr-28 text-base text-wpu-black placeholder:text-slate-400 focus:border-wpu-orange focus:outline-none"
+            className="min-h-[48px] w-full rounded-2xl border-2 border-wpu-orange/90 bg-white px-4 py-3 pr-24 text-base text-wpu-black placeholder:text-slate-400 focus:border-wpu-orange focus:outline-none sm:px-5 sm:pr-28"
           />
           <button
             type="button"
             onClick={applySearch}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-xl px-3 py-1.5 text-sm font-semibold text-wpu-orange hover:bg-wpu-orange/10"
+            className="absolute right-2 top-1/2 min-h-[40px] -translate-y-1/2 rounded-xl px-3 py-1.5 text-sm font-semibold text-wpu-orange hover:bg-wpu-orange/10 sm:right-3"
           >
             Search
           </button>
@@ -128,13 +141,13 @@ export function HomeFeed({ showCreateCard = true }: HomeFeedProps) {
           <button
             type="button"
             onClick={() => setFilterOpen((current) => !current)}
-            className="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            className="min-h-[48px] w-full rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
           >
             Filters
           </button>
 
           {filterOpen && (
-            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-[min(20rem,calc(100vw-1rem))] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
               <div className="space-y-3">
                 <div>
                   <label htmlFor="feed-category" className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -211,7 +224,7 @@ export function HomeFeed({ showCreateCard = true }: HomeFeedProps) {
         </div>
       </div>
 
-      <div className="flex gap-6 border-b border-slate-200">
+      <div className="flex gap-4 overflow-x-auto border-b border-slate-200 pb-px sm:gap-6">
         {([
           { value: "all", label: "All" },
           { value: "LOST", label: "Lost" },
@@ -221,7 +234,7 @@ export function HomeFeed({ showCreateCard = true }: HomeFeedProps) {
             key={option.value}
             type="button"
             onClick={() => setTab(option.value)}
-            className={`border-b-2 px-1 py-3 text-sm font-semibold transition-colors ${
+            className={`shrink-0 border-b-2 px-1 py-3 text-sm font-semibold transition-colors ${
               tab === option.value
                 ? "border-wpu-orange text-wpu-orange"
                 : "border-transparent text-slate-600 hover:text-slate-900"
@@ -235,6 +248,10 @@ export function HomeFeed({ showCreateCard = true }: HomeFeedProps) {
       {loading ? (
         <div className="flex justify-center py-12">
           <span className="h-8 w-8 animate-spin rounded-full border-2 border-wpu-orange border-t-transparent" />
+        </div>
+      ) : loadError ? (
+        <div className="rounded-xl border border-dashed border-red-200 bg-red-50 px-4 py-10 text-center text-sm text-red-700">
+          {loadError}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -250,8 +267,8 @@ export function HomeFeed({ showCreateCard = true }: HomeFeedProps) {
                 <span className="text-sm font-medium text-wpu-black">New Post</span>
               </div>
               <div className="p-4">
-                <h2 className="font-semibold text-wpu-black">Post Lost or Found Item</h2>
-                <p className="mt-1 text-sm text-wpu-black-light">Create a new listing</p>
+                <h2 className="font-semibold text-wpu-black">Post item</h2>
+                <p className="mt-1 text-sm text-wpu-black-light">Create listing</p>
               </div>
             </Link>
           )}

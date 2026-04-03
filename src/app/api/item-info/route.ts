@@ -3,11 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { createNotificationAndEmail } from "@/lib/notify";
 import { z } from "zod";
 import { getValidatedSessionUser } from "@/lib/session-user";
+import { apiErrorResponse, invalidJsonResponse } from "@/lib/api-errors";
 
 const schema = z.object({
   itemId: z.string(),
-  type: z.enum(["SEEN", "RETURNED_TO_DESK"]),
-  message: z.string().optional(),
+  type: z.enum(["INFO", "SEEN", "RETURNED_TO_DESK"]).optional(),
+  message: z.string().trim().min(1, "Please add a short note."),
 });
 
 export async function POST(req: Request) {
@@ -16,7 +17,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return invalidJsonResponse();
+    }
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -24,7 +30,8 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const { itemId, type, message } = parsed.data;
+    const { itemId, message } = parsed.data;
+    const type = parsed.data.type ?? "INFO";
     const item = await prisma.itemPost.findUnique({
       where: { id: itemId },
       include: { postedBy: { select: { name: true } } },
@@ -44,7 +51,7 @@ export async function POST(req: Request) {
     }
 
     const update = await prisma.itemInfoUpdate.create({
-      data: { itemId, userId: user.id, type, message: message ?? null },
+      data: { itemId, userId: user.id, type, message },
       include: { user: { select: { name: true } } },
     });
 
@@ -53,12 +60,12 @@ export async function POST(req: Request) {
       itemTitle: item.title,
       type,
       reporterName: update.user.name,
-      message: message ?? null,
+      message,
     });
 
     return NextResponse.json(update);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to submit info" }, { status: 500 });
+    return apiErrorResponse(e, "We couldn't submit that information. Please try again.");
   }
 }

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { getValidatedSessionUser } from "@/lib/session-user";
+import {
+  requireConversationParticipant,
+  unauthorizedResponse,
+} from "@/lib/authorization";
 
 const postSchema = z.object({ emoji: z.string().min(1).max(10) });
 
@@ -11,16 +15,13 @@ export async function POST(
 ) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   try {
     const { id: conversationId, messageId } = await params;
-    const conv = await prisma.conversation.findUnique({
-      where: { id: conversationId },
-      select: { user1Id: true, user2Id: true },
-    });
-    if (!conv || (conv.user1Id !== user.id && conv.user2Id !== user.id)) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const { response } = await requireConversationParticipant(conversationId, user.id);
+    if (response) {
+      return response;
     }
     const body = await req.json();
     const parsed = postSchema.safeParse(body);
@@ -54,16 +55,13 @@ export async function DELETE(
 ) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   try {
     const { id: conversationId, messageId } = await params;
-    const conv = await prisma.conversation.findUnique({
-      where: { id: conversationId },
-      select: { user1Id: true, user2Id: true },
-    });
-    if (!conv || (conv.user1Id !== user.id && conv.user2Id !== user.id)) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const { response } = await requireConversationParticipant(conversationId, user.id);
+    if (response) {
+      return response;
     }
     const { searchParams } = new URL(req.url);
     const emoji = searchParams.get("emoji");
@@ -86,15 +84,12 @@ export async function GET(
 ) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   const { id: conversationId, messageId } = await params;
-  const conv = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: { user1Id: true, user2Id: true },
-  });
-  if (!conv || (conv.user1Id !== user.id && conv.user2Id !== user.id)) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const { response } = await requireConversationParticipant(conversationId, user.id);
+  if (response) {
+    return response;
   }
   const reactions = await prisma.messageReaction.findMany({
     where: { messageId },

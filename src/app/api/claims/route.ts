@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { createNotificationAndEmail } from "@/lib/notify";
 import { z } from "zod";
 import { getValidatedSessionUser } from "@/lib/session-user";
+import { unauthorizedResponse } from "@/lib/authorization";
+import { apiErrorResponse, invalidJsonResponse } from "@/lib/api-errors";
 
 const createSchema = z.object({
   itemId: z.string(),
@@ -13,10 +15,15 @@ const createSchema = z.object({
 export async function POST(req: Request) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   try {
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return invalidJsonResponse();
+    }
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -81,12 +88,13 @@ export async function POST(req: Request) {
       claimId: claim.id,
       itemId,
       itemTitle: item.title,
+      requesterUserId: user.id,
       requesterName: claim.requester.name,
     });
 
     return NextResponse.json(claim);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to create claim" }, { status: 500 });
+    return apiErrorResponse(e, "We couldn't submit your claim. Please try again.");
   }
 }

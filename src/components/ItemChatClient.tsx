@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { getErrorMessage } from "@/lib/client-errors";
 
 type Reaction = {
   id: string;
@@ -60,19 +61,33 @@ export function ItemChatClient({
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [loading, setLoading] = useState(!initialConv);
   const [startError, setStartError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  async function loadMessages(conversationId: string) {
+    const response = await fetch(`/api/conversations/${conversationId}/messages`, {
+      cache: "no-store",
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(getErrorMessage(data, "Couldn't load this conversation."));
+    }
+
+    setMessages(Array.isArray(data) ? data : []);
+  }
 
   useEffect(() => {
     if (initialConv) {
       setConv(initialConv);
       setStartError(null);
       setLoading(false);
-      fetch(`/api/conversations/${initialConv.id}/messages`)
-        .then((r) => r.json())
-        .then(setMessages)
-        .catch(() => {});
+      loadMessages(initialConv.id).catch((error: unknown) => {
+        setSendError(getErrorMessage(error, "Couldn't load this conversation."));
+      });
       return;
     }
     if (!canStartConversation) {
@@ -91,18 +106,21 @@ export function ItemChatClient({
       })
       .catch((error: unknown) => {
         setConv(null);
-        setStartError(error instanceof Error ? error.message : "Could not start conversation.");
+        setStartError(getErrorMessage(error, "Couldn't start this conversation."));
       })
       .finally(() => setLoading(false));
   }, [itemId, initialConv, canStartConversation]);
 
   useEffect(() => {
     if (!conv?.id) return;
+    loadMessages(conv.id).catch((error: unknown) => {
+      setSendError(getErrorMessage(error, "Couldn't load this conversation."));
+    });
+
     const interval = setInterval(() => {
-      fetch(`/api/conversations/${conv.id}/messages`)
-        .then((r) => r.json())
-        .then(setMessages)
-        .catch(() => {});
+      loadMessages(conv.id).catch(() => {
+        // Keep the last successful message list visible if a background refresh fails.
+      });
     }, 1200);
     return () => clearInterval(interval);
   }, [conv?.id]);
@@ -116,6 +134,8 @@ export function ItemChatClient({
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if ((!body.trim() && !uploadingImage) || !conv?.id || sending) return;
+    setSendError(null);
+    setSendSuccess(null);
     setSending(true);
     try {
       const res = await fetch(`/api/conversations/${conv.id}/messages`, {
@@ -128,10 +148,15 @@ export function ItemChatClient({
       });
       const data = await res.json();
       if (res.ok) {
-        setMessages((prev) => [...prev, data]);
+        await loadMessages(conv.id);
         setBody("");
         setReplyingTo(null);
+        setSendSuccess("Message sent.");
+      } else {
+        setSendError(getErrorMessage(data, "Couldn't send your message."));
       }
+    } catch (error: unknown) {
+      setSendError(getErrorMessage(error, "Couldn't send your message."));
     } finally {
       setSending(false);
     }
@@ -140,6 +165,8 @@ export function ItemChatClient({
   async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith("image/") || !conv?.id || sending) return;
+    setSendError(null);
+    setSendSuccess(null);
     setUploadingImage(true);
     try {
       const formData = new FormData();
@@ -147,7 +174,7 @@ export function ItemChatClient({
       formData.append("type", "item");
       const up = await fetch("/api/upload", { method: "POST", body: formData });
       const upData = await up.json();
-      if (!up.ok) throw new Error(upData.error || "Upload failed");
+      if (!up.ok) throw new Error(getErrorMessage(upData, "Photo upload failed."));
       const res = await fetch(`/api/conversations/${conv.id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,11 +186,14 @@ export function ItemChatClient({
       });
       const data = await res.json();
       if (res.ok) {
-        setMessages((prev) => [...prev, data]);
+        await loadMessages(conv.id);
         setReplyingTo(null);
+        setSendSuccess("Photo sent.");
+      } else {
+        throw new Error(getErrorMessage(data, "Couldn't send your photo."));
       }
-    } catch {
-      // could toast
+    } catch (error: unknown) {
+      setSendError(getErrorMessage(error, "Couldn't send your photo."));
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -180,10 +210,14 @@ export function ItemChatClient({
         body: JSON.stringify({ emoji }),
       });
       if (res.ok) {
-        const list = await fetch(`/api/conversations/${conv.id}/messages`).then((r) => r.json());
-        setMessages(list);
+        await loadMessages(conv.id);
+      } else {
+        const data = await res.json();
+        setSendError(getErrorMessage(data, "Couldn't react to that message."));
       }
-    } catch {}
+    } catch (error: unknown) {
+      setSendError(getErrorMessage(error, "Couldn't react to that message."));
+    }
     setReactionMenu(null);
   }
 
@@ -198,7 +232,7 @@ export function ItemChatClient({
   if (!conv) {
     return (
       <div className="rounded-xl border border-wpu-black/10 bg-white p-8 text-center">
-        <p className="text-wpu-black-light">{startError ?? "Could not start conversation."}</p>
+        <p className="text-wpu-black-light">{startError ?? "Couldn't start this conversation."}</p>
         <Link href={`/item/${itemId}`} className="mt-4 inline-block text-wpu-orange hover:underline">
           Back to item
         </Link>
@@ -207,14 +241,14 @@ export function ItemChatClient({
   }
 
   return (
-    <div className="flex flex-col rounded-xl border border-wpu-black/10 bg-white shadow-sm">
+    <div className="flex flex-col overflow-hidden rounded-xl border border-wpu-black/10 bg-white shadow-sm">
       {/* Chat header: other user identity (top-left), tappable to profile */}
-      <div className="flex items-center gap-3 border-b border-wpu-black/10 px-4 py-3">
-        <Link href={`/item/${itemId}`} className="text-sm font-medium text-wpu-orange hover:underline">
+      <div className="flex flex-wrap items-center gap-3 border-b border-wpu-black/10 px-4 py-3">
+        <Link href={`/item/${itemId}`} className="min-h-[44px] text-sm font-medium text-wpu-orange hover:underline">
           ← Back to item
         </Link>
-        <div className="flex flex-1 items-center gap-3 border-l border-wpu-black/10 pl-3">
-          <Link href={`/user/${otherUser?.id ?? ""}`} className="flex items-center gap-2 rounded-lg hover:bg-wpu-orange-light/50">
+        <div className="flex min-w-0 flex-1 items-center gap-3 border-l border-wpu-black/10 pl-3">
+          <Link href={`/user/${otherUser?.id ?? ""}`} className="flex min-w-0 items-center gap-2 rounded-lg hover:bg-wpu-orange-light/50">
             <div className="h-10 w-10 overflow-hidden rounded-full border border-wpu-black/20 bg-wpu-gray-light">
               {otherUser?.profilePhotoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -225,7 +259,7 @@ export function ItemChatClient({
                 </div>
               )}
             </div>
-            <span className="font-semibold text-wpu-black">{otherUser?.name ?? posterName}</span>
+            <span className="truncate font-semibold text-wpu-black">{otherUser?.name ?? posterName}</span>
           </Link>
         </div>
       </div>
@@ -324,6 +358,14 @@ export function ItemChatClient({
         <div ref={bottomRef} />
       </div>
       <form onSubmit={handleSend} className="border-t border-wpu-black/10 p-4">
+        {sendError && (
+          <p className="mb-2 text-sm text-red-600">{sendError}</p>
+        )}
+        {sendSuccess && (
+          <p className="mb-2 text-sm text-emerald-700" role="status">
+            {sendSuccess}
+          </p>
+        )}
         {replyingTo && (
           <div className="mb-2 flex items-center justify-between rounded-lg border border-wpu-black/20 bg-wpu-gray-light px-3 py-2 text-sm">
             <div className="min-w-0 flex-1">
@@ -333,14 +375,14 @@ export function ItemChatClient({
             <button type="button" onClick={() => setReplyingTo(null)} className="shrink-0 text-wpu-gray hover:text-wpu-black">✕</button>
           </div>
         )}
-        <div className="flex gap-2">
+          <div className="grid gap-2 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:items-center">
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={sending || uploadingImage}
-            className="shrink-0 rounded-lg border border-wpu-black/20 px-3 py-2 text-wpu-black hover:bg-wpu-orange-light disabled:opacity-50"
+            className="min-h-[44px] shrink-0 rounded-lg border border-wpu-black/20 px-3 py-2 text-wpu-black hover:bg-wpu-orange-light disabled:opacity-50"
             title="Upload image"
           >
             📁
@@ -349,7 +391,7 @@ export function ItemChatClient({
             type="button"
             onClick={() => cameraInputRef.current?.click()}
             disabled={sending || uploadingImage}
-            className="shrink-0 rounded-lg border border-wpu-black/20 px-3 py-2 text-wpu-black hover:bg-wpu-orange-light disabled:opacity-50"
+            className="min-h-[44px] shrink-0 rounded-lg border border-wpu-black/20 px-3 py-2 text-wpu-black hover:bg-wpu-orange-light disabled:opacity-50"
             title="Take photo"
           >
             {uploadingImage ? "…" : "📷"}
@@ -360,14 +402,14 @@ export function ItemChatClient({
             onChange={(e) => setBody(e.target.value)}
             placeholder="Type a message…"
             maxLength={2000}
-            className="flex-1 rounded-lg border border-wpu-black/20 bg-white px-3 py-2 text-wpu-black placeholder-wpu-gray focus:border-wpu-orange focus:outline-none focus:ring-1 focus:ring-wpu-orange"
+            className="min-h-[44px] w-full rounded-lg border border-wpu-black/20 bg-white px-3 py-2 text-wpu-black placeholder-wpu-gray focus:border-wpu-orange focus:outline-none focus:ring-1 focus:ring-wpu-orange"
           />
           <button
             type="submit"
             disabled={(!body.trim() && !uploadingImage) || sending}
-            className="rounded-lg bg-wpu-orange px-4 py-2 font-medium text-white hover:bg-wpu-orange-hover disabled:opacity-50"
+            className="min-h-[44px] rounded-lg bg-wpu-orange px-4 py-2 font-medium text-white hover:bg-wpu-orange-hover disabled:opacity-50"
           >
-            Send
+            {sending ? "Sending..." : uploadingImage ? "Uploading..." : "Send"}
           </button>
         </div>
       </form>

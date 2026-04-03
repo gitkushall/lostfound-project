@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { getValidatedSessionUser } from "@/lib/session-user";
+import { unauthorizedResponse } from "@/lib/authorization";
+import { apiErrorResponse, invalidJsonResponse } from "@/lib/api-errors";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -11,25 +12,55 @@ const updateSchema = z.object({
 });
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getValidatedSessionUser();
+  if (!user) {
+    return unauthorizedResponse();
   }
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { id: true, name: true, email: true, bio: true, profilePhotoUrl: true, createdAt: true },
+  const [profile, postsCount, returnedCount, posts] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { id: true, name: true, email: true, bio: true, profilePhotoUrl: true, createdAt: true },
+    }),
+    prisma.itemPost.count({
+      where: { postedByUserId: user.id },
+    }),
+    prisma.itemPost.count({
+      where: { postedByUserId: user.id, status: "RETURNED" },
+    }),
+    prisma.itemPost.findMany({
+      where: { postedByUserId: user.id },
+      orderBy: { createdAt: "desc" },
+      include: {
+        claimRequests: {
+          include: { requester: { select: { id: true, name: true } } },
+        },
+      },
+    }),
+  ]);
+
+  if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({
+    ...profile,
+    stats: {
+      postsCount,
+      returnedCount,
+    },
+    posts,
   });
-  if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(user);
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getValidatedSessionUser();
+  if (!user) {
+    return unauthorizedResponse();
   }
   try {
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return invalidJsonResponse();
+    }
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -37,14 +68,14 @@ export async function PATCH(req: NextRequest) {
         { status: 400 }
       );
     }
-    const user = await prisma.user.update({
-      where: { id: session.user.id },
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
       data: parsed.data,
       select: { id: true, name: true, email: true, bio: true, profilePhotoUrl: true },
     });
-    return NextResponse.json(user);
+    return NextResponse.json(updatedUser);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
+    return apiErrorResponse(e, "We couldn't update your profile. Please try again.");
   }
 }

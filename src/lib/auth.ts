@@ -35,14 +35,44 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.email = user.email ?? undefined;
+        token.name = user.name ?? undefined;
         token.role = (user as { role?: string }).role;
       }
+
+      if (!token.id) {
+        return token;
+      }
+
+      const { prisma } = await import("./prisma");
+      const dbUser = await prisma.user.findUnique({
+        where: { id: token.id as string },
+        select: { id: true, email: true, name: true, role: true },
+      });
+
+      if (!dbUser) {
+        delete token.id;
+        delete token.email;
+        delete token.name;
+        delete token.role;
+        token.invalid = true;
+        return token;
+      }
+
+      token.id = dbUser.id;
+      token.email = dbUser.email;
+      token.name = dbUser.name;
+      token.role = dbUser.role;
+      delete token.invalid;
+
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        (session.user as { id?: string }).id = token.id as string;
-        (session.user as { role?: string }).role = token.role as string;
+      if (session.user && token.id && !token.invalid) {
+        session.user.id = token.id as string;
+        session.user.email = (token.email as string | undefined) ?? session.user.email;
+        session.user.name = (token.name as string | undefined) ?? session.user.name;
+        session.user.role = token.role as string | undefined;
       }
       return session;
     },

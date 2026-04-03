@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { createNotificationAndEmail } from "@/lib/notify";
 import { z } from "zod";
 import { getValidatedSessionUser } from "@/lib/session-user";
+import { forbiddenResponse, unauthorizedResponse } from "@/lib/authorization";
+import { apiErrorResponse, invalidJsonResponse } from "@/lib/api-errors";
 
 const updateSchema = z.object({
   status: z.enum(["APPROVED", "DENIED"]),
@@ -14,11 +16,16 @@ export async function PATCH(
 ) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   try {
     const { id } = await params;
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return invalidJsonResponse();
+    }
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -33,7 +40,7 @@ export async function PATCH(
     });
     if (!claim) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (claim.item.postedByUserId !== user.id) {
-      return NextResponse.json({ error: "Only the poster can approve/deny" }, { status: 403 });
+      return forbiddenResponse("Only the post owner can approve or deny claims.");
     }
     if (claim.status !== "PENDING") {
       return NextResponse.json(
@@ -78,6 +85,6 @@ export async function PATCH(
     return NextResponse.json(updated);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to update claim" }, { status: 500 });
+    return apiErrorResponse(e, "We couldn't update this claim. Please try again.");
   }
 }

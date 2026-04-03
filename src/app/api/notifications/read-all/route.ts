@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPrismaApiError } from "@/lib/prisma-errors";
+import { getValidatedSessionUser } from "@/lib/session-user";
+import { unauthorizedResponse } from "@/lib/authorization";
 
 export async function PATCH() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getValidatedSessionUser();
+  if (!user) {
+    return unauthorizedResponse();
   }
   try {
     await prisma.notification.updateMany({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
       data: { isRead: true },
     });
     return NextResponse.json({ ok: true });

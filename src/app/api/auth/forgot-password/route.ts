@@ -6,6 +6,22 @@ import crypto from "crypto";
 
 const schema = z.object({ email: z.string().email() });
 
+function getAppBaseUrl() {
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL;
+  }
+
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  return "http://localhost:3000";
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -22,7 +38,7 @@ export async function POST(req: Request) {
     await prisma.passwordResetToken.create({
       data: { userId: user.id, token, expiresAt },
     });
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const baseUrl = getAppBaseUrl();
     const resetLink = `${baseUrl}/reset-password?token=${token}`;
     await sendPasswordResetEmail(user.email, resetLink);
     return NextResponse.json({ message: "If an account exists, you will receive a reset link." });

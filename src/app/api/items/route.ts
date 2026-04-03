@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getValidatedSessionUser } from "@/lib/session-user";
+import { apiErrorResponse, invalidJsonResponse } from "@/lib/api-errors";
 
 const createSchema = z.object({
   type: z.enum(["LOST", "FOUND"]),
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(items);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to fetch items" }, { status: 500 });
+    return apiErrorResponse(e, "Couldn't load posts right now. Please try again.");
   }
 }
 
@@ -78,7 +79,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return invalidJsonResponse();
+    }
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -98,6 +104,6 @@ export async function POST(req: Request) {
     return NextResponse.json(item);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to create item" }, { status: 500 });
+    return apiErrorResponse(e, "We couldn't create your post. Please try again.");
   }
 }

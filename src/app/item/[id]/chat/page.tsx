@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ItemChatClient } from "@/components/ItemChatClient";
 import { getValidatedSessionUser } from "@/lib/session-user";
+import { getOrCreateConversationForItem } from "@/lib/conversations";
 
 export default async function ItemChatPage({
   params,
@@ -21,6 +22,10 @@ export default async function ItemChatPage({
   });
   if (!item) notFound();
   const isOwner = item.postedBy.id === currentUserId;
+
+  if (isOwner && !conversationId) {
+    redirect(`/item/${itemId}`);
+  }
 
   const baseWhere = {
     itemId,
@@ -47,16 +52,12 @@ export default async function ItemChatPage({
       });
 
   if (!conv && !isOwner) {
-    const user1Id = currentUserId < item.postedBy.id ? currentUserId : item.postedBy.id;
-    const user2Id = currentUserId < item.postedBy.id ? item.postedBy.id : currentUserId;
-
-    conv = await prisma.conversation.create({
-      data: { itemId, user1Id, user2Id },
-      include: {
-        user1: { select: { id: true, name: true, profilePhotoUrl: true } },
-        user2: { select: { id: true, name: true, profilePhotoUrl: true } },
-      },
-    });
+    try {
+      const created = await getOrCreateConversationForItem(itemId, currentUserId);
+      conv = created.conversation;
+    } catch {
+      conv = null;
+    }
   }
 
   return (

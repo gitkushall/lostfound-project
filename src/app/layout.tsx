@@ -21,8 +21,13 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased bg-white text-wpu-black font-sans">
-        <Nav isLoggedIn={!!user} userId={user?.id ?? null} />
-        <main className="min-h-screen bg-white pt-16 pb-20 md:pb-8">{children}</main>
+        <Nav
+          isLoggedIn={!!user}
+          userId={user?.id ?? null}
+          userName={user?.name ?? null}
+          userProfilePhotoUrl={user?.profilePhotoUrl ?? null}
+        />
+        <main className="min-h-screen bg-white pt-[calc(4.5rem+max(env(safe-area-inset-top),0.75rem))] pb-[calc(5rem+env(safe-area-inset-bottom))] md:pt-16 md:pb-8">{children}</main>
       </body>
     </html>
   );

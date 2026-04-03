@@ -12,7 +12,7 @@ export async function getValidatedSessionUser() {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, role: true },
+    select: { id: true, name: true, email: true, role: true, profilePhotoUrl: true },
   });
 
   return user;

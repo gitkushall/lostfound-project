@@ -79,7 +79,7 @@ model ItemInfoUpdate {
   id         String   @id @default(cuid())
   itemId     String
   userId     String
-  type       String   // SEEN | RETURNED_TO_DESK
+  type       String   // INFO | legacy SEEN | RETURNED_TO_DESK
   message    String?
   createdAt  DateTime @default(now())
 
@@ -98,6 +98,8 @@ model Conversation {
   user1 User     @relation("User1", fields: [user1Id], references: [id], onDelete: Cascade)
   user2 User     @relation("User2", fields: [user2Id], references: [id], onDelete: Cascade)
   messages Message[]
+
+  @@unique([itemId, user1Id, user2Id])
 }
 
 model Message {

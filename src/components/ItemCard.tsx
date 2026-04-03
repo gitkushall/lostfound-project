@@ -38,16 +38,18 @@ export function ItemCard({ item }: { item: Item }) {
           </div>
         )}
       </div>
-      <div className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="line-clamp-2 text-base font-semibold leading-6 text-wpu-black">
+      <div className="space-y-2.5 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="min-w-0 flex-1 line-clamp-2 text-sm font-semibold leading-6 text-wpu-black sm:text-base">
             {item.title}
           </h2>
-          <StatusBadge status={item.status} />
+          <div className="shrink-0">
+            <StatusBadge status={item.status} />
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-3 text-sm">
-          <p className="font-medium text-wpu-black/80">{item.category}</p>
-          <p className="text-wpu-black/55">{date}</p>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+          <p className="min-w-0 truncate font-medium text-wpu-black/80">{item.category}</p>
+          <p className="shrink-0 text-wpu-black/55">{date}</p>
         </div>
       </div>
     </article>

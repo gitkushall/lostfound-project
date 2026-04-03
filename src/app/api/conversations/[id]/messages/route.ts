@@ -3,6 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { createNotificationAndEmail } from "@/lib/notify";
 import { z } from "zod";
 import { getValidatedSessionUser } from "@/lib/session-user";
+import {
+  requireConversationParticipant,
+  unauthorizedResponse,
+} from "@/lib/authorization";
+import { apiErrorResponse, invalidJsonResponse } from "@/lib/api-errors";
 
 export async function GET(
   _req: NextRequest,
@@ -10,15 +15,12 @@ export async function GET(
 ) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   const { id } = await params;
-  const conv = await prisma.conversation.findUnique({
-    where: { id },
-    select: { user1Id: true, user2Id: true },
-  });
-  if (!conv || (conv.user1Id !== user.id && conv.user2Id !== user.id)) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const { response } = await requireConversationParticipant(id, user.id);
+  if (response) {
+    return response;
   }
   const messages = await prisma.message.findMany({
     where: { conversationId: id },
@@ -51,21 +53,35 @@ export async function POST(
 ) {
   const user = await getValidatedSessionUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorizedResponse();
   }
   try {
     const { id } = await params;
+    const auth = await requireConversationParticipant(id, user.id);
+    if (auth.response) {
+      return auth.response;
+    }
     const conv = await prisma.conversation.findUnique({
       where: { id },
-      include: { item: { select: { id: true, title: true } } },
+      include: {
+        item: { select: { id: true, title: true } },
+      },
     });
-    if (!conv || (conv.user1Id !== user.id && conv.user2Id !== user.id)) {
+    if (!conv) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return invalidJsonResponse();
+    }
     const parsed = postSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid message" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Write a message or attach a photo before sending." },
+        { status: 400 }
+      );
     }
     let replyToMessageId: string | null = null;
     if (parsed.data.replyToMessageId) {
@@ -74,11 +90,32 @@ export async function POST(
       });
       if (replyTo) replyToMessageId = replyTo.id;
     }
-    const recipientId = conv.user1Id === user.id ? conv.user2Id : conv.user1Id;
+
+    const senderId = user.id;
+    const recipientId = conv.user1Id === senderId ? conv.user2Id : conv.user1Id;
+
+    if (!senderId || !recipientId || senderId === recipientId) {
+      return NextResponse.json(
+        { error: "Invalid conversation participants" },
+        { status: 409 }
+      );
+    }
+
+    const participantCount = await prisma.user.count({
+      where: { id: { in: [senderId, recipientId] } },
+    });
+
+    if (participantCount !== 2) {
+      return NextResponse.json(
+        { error: "Conversation participants are no longer available" },
+        { status: 409 }
+      );
+    }
+
     const message = await prisma.message.create({
       data: {
         conversationId: id,
-        senderId: user.id,
+        senderId,
         body: parsed.data.body?.trim() ?? "",
         imageUrl: parsed.data.imageUrl ?? null,
         replyToMessageId,
@@ -101,12 +138,13 @@ export async function POST(
       conversationId: id,
       itemId: conv.item.id,
       itemTitle: conv.item.title,
+      senderId,
       senderName: message.sender.name,
       messageBody: preview,
     });
     return NextResponse.json(message);
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
+    return apiErrorResponse(e, "We couldn't send your message. Please try again.");
   }
 }

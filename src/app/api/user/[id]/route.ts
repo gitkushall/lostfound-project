@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getValidatedSessionUser } from "@/lib/session-user";
+import { unauthorizedResponse } from "@/lib/authorization";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getValidatedSessionUser();
+  if (!user) {
+    return unauthorizedResponse();
   }
   const { id } = await params;
-  const user = await prisma.user.findUnique({
+  const profile = await prisma.user.findUnique({
     where: { id },
     select: {
       id: true,
@@ -22,12 +22,12 @@ export async function GET(
       emailVerified: true,
     },
   });
-  if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const postsCount = await prisma.itemPost.count({
     where: { postedByUserId: id },
   });
   return NextResponse.json({
-    ...user,
+    ...profile,
     postsCount,
   });
 }
