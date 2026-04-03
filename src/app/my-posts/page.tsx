@@ -1,14 +1,13 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { MyPostsClient } from "@/components/MyPostsClient";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 export default async function MyPostsPage() {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
+  const user = await getValidatedSessionUser();
+  if (!user) redirect("/login");
   const items = await prisma.itemPost.findMany({
-    where: { postedByUserId: session.user?.id ?? "" },
+    where: { postedByUserId: user.id },
     orderBy: { createdAt: "desc" },
     include: {
       postedBy: { select: { id: true, name: true } },

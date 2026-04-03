@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getValidatedSessionUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { searchParams } = new URL(req.url);
@@ -15,8 +14,8 @@ export async function GET(req: NextRequest) {
       where: {
         itemId,
         OR: [
-          { user1Id: session.user.id },
-          { user2Id: session.user.id },
+          { user1Id: user.id },
+          { user2Id: user.id },
         ],
       },
       include: {
@@ -30,8 +29,8 @@ export async function GET(req: NextRequest) {
   const list = await prisma.conversation.findMany({
     where: {
       OR: [
-        { user1Id: session.user.id },
-        { user2Id: session.user.id },
+        { user1Id: user.id },
+        { user2Id: user.id },
       ],
     },
     orderBy: { createdAt: "desc" },
@@ -45,8 +44,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getValidatedSessionUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -57,14 +56,14 @@ export async function POST(req: Request) {
     const item = await prisma.itemPost.findUnique({ where: { id: itemId } });
     if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
     const otherId = item.postedByUserId;
-    if (otherId === session.user.id) {
+    if (otherId === user.id) {
       return NextResponse.json(
         { error: "You cannot start a conversation with yourself" },
         { status: 400 }
       );
     }
-    const user1Id = session.user.id < otherId ? session.user.id : otherId;
-    const user2Id = session.user.id < otherId ? otherId : session.user.id;
+    const user1Id = user.id < otherId ? user.id : otherId;
+    const user2Id = user.id < otherId ? otherId : user.id;
     let conv = await prisma.conversation.findFirst({
       where: { itemId, user1Id, user2Id },
       include: {

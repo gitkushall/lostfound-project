@@ -1,16 +1,16 @@
 import { notFound } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ItemDetailClient } from "@/components/ItemDetailClient";
+import { redirect } from "next/navigation";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 export default async function ItemPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session) notFound();
+  const user = await getValidatedSessionUser();
+  if (!user) redirect("/login");
   const { id } = await params;
   const item = await prisma.itemPost.findUnique({
     where: { id },
@@ -30,7 +30,7 @@ export default async function ItemPage({
     <div className="mx-auto max-w-2xl px-4 py-6">
       <ItemDetailClient
         item={JSON.parse(JSON.stringify(item))}
-        currentUserId={session.user?.id ?? ""}
+        currentUserId={user.id}
       />
     </div>
   );

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { ITEM_STATUS_LABELS } from "@/lib/item-options";
+import { StatusBadge } from "./StatusBadge";
 
 type Item = {
   id: string;
@@ -103,9 +105,7 @@ export function MyPostsClient({ items }: { items: Item[] }) {
                     >
                       {item.type}
                     </span>
-                    <span className="rounded-full border border-wpu-black/20 bg-wpu-gray-light px-2 py-1 text-xs font-medium text-wpu-black">
-                      {item.status}
-                    </span>
+                    <StatusBadge status={item.status} />
                     {pendingClaims.length > 0 && (
                       <span className="rounded-full bg-wpu-orange/30 px-2 py-0.5 text-xs font-medium text-wpu-orange">
                         {pendingClaims.length} claim(s)
@@ -122,21 +122,23 @@ export function MyPostsClient({ items }: { items: Item[] }) {
               >
                 View
               </Link>
-              {(item.status === "OPEN" || item.status === "PENDING") && (
+              {(item.status === "OPEN" || item.status === "CLAIM_PENDING" || item.status === "CLAIMED") && (
                 <>
+                  {item.status !== "CLAIMED" && (
+                    <button
+                      type="button"
+                      onClick={() => updateStatus(item.id, "CLAIMED")}
+                      className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700"
+                    >
+                      {ITEM_STATUS_LABELS.CLAIMED}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => updateStatus(item.id, "RETURNED")}
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+                    className="rounded-lg bg-slate-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
                   >
                     Mark returned
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateStatus(item.id, "CLOSED")}
-                    className="rounded-lg bg-wpu-gray-light px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10"
-                  >
-                    Close
                   </button>
                 </>
               )}

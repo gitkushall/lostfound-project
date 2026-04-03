@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotificationAndEmail } from "@/lib/notify";
 import { z } from "zod";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getValidatedSessionUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
@@ -18,7 +17,7 @@ export async function GET(
     where: { id },
     select: { user1Id: true, user2Id: true },
   });
-  if (!conv || (conv.user1Id !== session.user.id && conv.user2Id !== session.user.id)) {
+  if (!conv || (conv.user1Id !== user.id && conv.user2Id !== user.id)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const messages = await prisma.message.findMany({
@@ -50,8 +49,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getValidatedSessionUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -60,7 +59,7 @@ export async function POST(
       where: { id },
       include: { item: { select: { id: true, title: true } } },
     });
-    if (!conv || (conv.user1Id !== session.user.id && conv.user2Id !== session.user.id)) {
+    if (!conv || (conv.user1Id !== user.id && conv.user2Id !== user.id)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     const body = await req.json();
@@ -75,11 +74,11 @@ export async function POST(
       });
       if (replyTo) replyToMessageId = replyTo.id;
     }
-    const recipientId = conv.user1Id === session.user.id ? conv.user2Id : conv.user1Id;
+    const recipientId = conv.user1Id === user.id ? conv.user2Id : conv.user1Id;
     const message = await prisma.message.create({
       data: {
         conversationId: id,
-        senderId: session.user.id,
+        senderId: user.id,
         body: parsed.data.body?.trim() ?? "",
         imageUrl: parsed.data.imageUrl ?? null,
         replyToMessageId,

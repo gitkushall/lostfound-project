@@ -1,16 +1,15 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { ProfileClient } from "@/components/ProfileClient";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 export default async function ProfilePage() {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
+  const user = await getValidatedSessionUser();
+  if (!user) redirect("/login");
   return (
     <div className="mx-auto max-w-xl px-4 py-6">
       <ProfileClient
-        name={session.user?.name ?? ""}
-        email={session.user?.email ?? ""}
+        name={user.name ?? ""}
+        email={user.email ?? ""}
       />
     </div>
   );

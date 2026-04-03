@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { StatusBadge } from "./StatusBadge";
 
 type Item = {
   id: string;
@@ -37,22 +38,17 @@ export function ItemCard({ item }: { item: Item }) {
           </div>
         )}
       </div>
-      <div className="p-4">
-        <div className="mb-2 flex flex-wrap gap-2">
-          <span
-            className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${
-              item.type === "LOST" ? "bg-amber-500 text-white" : "bg-emerald-600 text-white"
-            }`}
-          >
-            {item.type}
-          </span>
-          <span className="rounded-full border border-wpu-black/20 bg-wpu-gray-light px-2.5 py-1 text-xs font-medium text-wpu-black">
-            {item.status}
-          </span>
+      <div className="space-y-3 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="line-clamp-2 text-base font-semibold leading-6 text-wpu-black">
+            {item.title}
+          </h2>
+          <StatusBadge status={item.status} />
         </div>
-        <h2 className="font-semibold text-wpu-black">{item.title}</h2>
-        <p className="mt-1 text-sm font-medium text-wpu-black">{item.category}</p>
-        <p className="mt-1 text-sm text-wpu-black-light">{item.locationText} · {date}</p>
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <p className="font-medium text-wpu-black/80">{item.category}</p>
+          <p className="text-wpu-black/55">{date}</p>
+        </div>
       </div>
     </article>
   );

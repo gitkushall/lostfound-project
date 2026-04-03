@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ITEM_STATUS_LABELS } from "@/lib/item-options";
 
 type Item = {
   id: string;
@@ -217,10 +218,10 @@ export function EditPostForm({
           onChange={(e) => setStatus(e.target.value)}
           className="mt-1 w-full rounded-lg border border-wpu-black/20 px-3 py-2 text-wpu-black focus:border-wpu-orange focus:outline-none focus:ring-1 focus:ring-wpu-orange"
         >
-          <option value="OPEN">Open</option>
-          <option value="PENDING">Pending</option>
-          <option value="RETURNED">Returned</option>
-          <option value="CLOSED">Closed</option>
+          <option value="OPEN">{ITEM_STATUS_LABELS.OPEN}</option>
+          <option value="CLAIM_PENDING">{ITEM_STATUS_LABELS.CLAIM_PENDING}</option>
+          <option value="CLAIMED">{ITEM_STATUS_LABELS.CLAIMED}</option>
+          <option value="RETURNED">{ITEM_STATUS_LABELS.RETURNED}</option>
         </select>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

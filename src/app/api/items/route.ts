@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 const createSchema = z.object({
   type: z.enum(["LOST", "FOUND"]),
@@ -26,22 +26,31 @@ export async function GET(req: NextRequest) {
     const dateTo = searchParams.get("dateTo");
     const sort = searchParams.get("sort") || "newest";
 
-    const where: Record<string, unknown> = {};
+    const where: Prisma.ItemPostWhereInput = {};
     if (type && ["LOST", "FOUND"].includes(type)) where.type = type;
     if (category) where.category = category;
     if (status) where.status = status;
-    if (location) where.locationText = { contains: location };
+    if (location) {
+      where.locationText = { contains: location, mode: "insensitive" };
+    }
     if (search) {
       where.OR = [
-        { title: { contains: search } },
-        { description: { contains: search } },
-        { category: { contains: search } },
+        { title: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+        { category: { contains: search, mode: "insensitive" } },
+        { locationText: { contains: search, mode: "insensitive" } },
       ];
     }
     if (dateFrom || dateTo) {
       where.dateOccurred = {};
-      if (dateFrom) (where.dateOccurred as Record<string, Date>).gte = new Date(dateFrom);
-      if (dateTo) (where.dateOccurred as Record<string, Date>).lte = new Date(dateTo);
+      if (dateFrom) {
+        where.dateOccurred.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        const endOfDay = new Date(dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        where.dateOccurred.lte = endOfDay;
+      }
     }
 
     const orderBy = sort === "newest"
@@ -64,8 +73,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getValidatedSessionUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -80,7 +89,7 @@ export async function POST(req: Request) {
     const data = {
       ...parsed.data,
       dateOccurred: new Date(parsed.data.dateOccurred),
-      postedByUserId: session.user.id,
+      postedByUserId: user.id,
     };
     const item = await prisma.itemPost.create({
       data,

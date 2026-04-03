@@ -42,12 +42,14 @@ export function ItemChatClient({
   conversation: initialConv,
   currentUserId,
   posterName,
+  canStartConversation,
 }: {
   itemId: string;
   itemTitle: string;
   conversation: Conversation | null;
   currentUserId: string;
   posterName: string;
+  canStartConversation: boolean;
 }) {
   const [conv, setConv] = useState<Conversation | null>(initialConv);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -57,6 +59,7 @@ export function ItemChatClient({
   const [reactionMenu, setReactionMenu] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [loading, setLoading] = useState(!initialConv);
+  const [startError, setStartError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -64,11 +67,18 @@ export function ItemChatClient({
   useEffect(() => {
     if (initialConv) {
       setConv(initialConv);
+      setStartError(null);
       setLoading(false);
       fetch(`/api/conversations/${initialConv.id}/messages`)
         .then((r) => r.json())
         .then(setMessages)
         .catch(() => {});
+      return;
+    }
+    if (!canStartConversation) {
+      setConv(null);
+      setStartError("No conversations yet for this post.");
+      setLoading(false);
       return;
     }
     fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId }) })
@@ -77,10 +87,14 @@ export function ItemChatClient({
         if (data.error) throw new Error(data.error);
         setConv(data);
         setMessages([]);
+        setStartError(null);
       })
-      .catch(() => setConv(null))
+      .catch((error: unknown) => {
+        setConv(null);
+        setStartError(error instanceof Error ? error.message : "Could not start conversation.");
+      })
       .finally(() => setLoading(false));
-  }, [itemId, initialConv]);
+  }, [itemId, initialConv, canStartConversation]);
 
   useEffect(() => {
     if (!conv?.id) return;
@@ -184,7 +198,7 @@ export function ItemChatClient({
   if (!conv) {
     return (
       <div className="rounded-xl border border-wpu-black/10 bg-white p-8 text-center">
-        <p className="text-wpu-black-light">Could not start conversation.</p>
+        <p className="text-wpu-black-light">{startError ?? "Could not start conversation."}</p>
         <Link href={`/item/${itemId}`} className="mt-4 inline-block text-wpu-orange hover:underline">
           Back to item
         </Link>

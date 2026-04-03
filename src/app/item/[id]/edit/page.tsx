@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { EditPostForm } from "@/components/EditPostForm";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 const CATEGORIES = [
   "Keys",
@@ -20,11 +19,11 @@ export default async function EditItemPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session) notFound();
+  const user = await getValidatedSessionUser();
+  if (!user) notFound();
   const { id } = await params;
   const item = await prisma.itemPost.findUnique({ where: { id } });
-  if (!item || item.postedByUserId !== session.user?.id) notFound();
+  if (!item || item.postedByUserId !== user.id) notFound();
   return (
     <div className="mx-auto max-w-xl px-4 py-6">
       <h1 className="text-2xl font-bold text-slate-900">Edit post</h1>

@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotificationAndEmail } from "@/lib/notify";
 import { z } from "zod";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 const schema = z.object({
   itemId: z.string(),
@@ -12,8 +11,8 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getValidatedSessionUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -37,7 +36,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    if (item.postedByUserId === session.user.id) {
+    if (item.postedByUserId === user.id) {
       return NextResponse.json(
         { error: "You cannot report info on your own post" },
         { status: 400 }
@@ -45,7 +44,7 @@ export async function POST(req: Request) {
     }
 
     const update = await prisma.itemInfoUpdate.create({
-      data: { itemId, userId: session.user.id, type, message: message ?? null },
+      data: { itemId, userId: user.id, type, message: message ?? null },
       include: { user: { select: { name: true } } },
     });
 

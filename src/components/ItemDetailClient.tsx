@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { ITEM_STATUS_LABELS } from "@/lib/item-options";
+import { StatusBadge } from "./StatusBadge";
 
 type Item = {
   id: string;
@@ -57,6 +59,9 @@ export function ItemDetailClient({
   const [infoSubmitting, setInfoSubmitting] = useState(false);
   const [infoError, setInfoError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const currentStatusLabel =
+    ITEM_STATUS_LABELS[(item.status in ITEM_STATUS_LABELS ? item.status : "OPEN") as keyof typeof ITEM_STATUS_LABELS];
 
   async function handleDelete() {
     if (!confirm("Remove this post from the public feed? This cannot be undone.")) return;
@@ -136,6 +141,20 @@ export function ItemDetailClient({
     } catch {}
   }
 
+  async function handleStatusUpdate(status: "CLAIMED" | "RETURNED") {
+    setStatusUpdating(true);
+    try {
+      await fetch(`/api/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      router.refresh();
+    } finally {
+      setStatusUpdating(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Link href="/" className="text-sm font-medium text-wpu-orange hover:underline">
@@ -169,14 +188,28 @@ export function ItemDetailClient({
             >
               {item.type}
             </span>
-            <span className="rounded-full bg-wpu-gray-light px-2.5 py-0.5 text-xs font-medium text-wpu-black-light">
-              {item.status}
-            </span>
+            <StatusBadge status={item.status} />
             <span className="rounded-full bg-wpu-gray-light px-2.5 py-0.5 text-xs text-wpu-black-light">
               {item.category}
             </span>
           </div>
           <h1 className="text-2xl font-bold text-wpu-black">{item.title}</h1>
+          <div className="mt-4 flex items-center gap-3 rounded-2xl bg-wpu-gray-light/80 px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-wpu-black/55">
+                Current status
+              </p>
+              <div className="mt-2">
+                <StatusBadge status={item.status} />
+              </div>
+            </div>
+            <p className="text-sm text-wpu-black/65">
+              {item.status === "OPEN" && "Available and ready for new leads or claims."}
+              {item.status === "CLAIM_PENDING" && "A claim request is under review by the post owner."}
+              {item.status === "CLAIMED" && "The owner has accepted a claimant and is arranging handoff."}
+              {item.status === "RETURNED" && "This item has been returned and is no longer active."}
+            </p>
+          </div>
           <p className="mt-2 text-wpu-black-light">{item.locationText} · {date}</p>
           {item.description && (
             <p className="mt-4 text-wpu-black-light">{item.description}</p>
@@ -223,6 +256,34 @@ export function ItemDetailClient({
               {deleting ? "Removing…" : "Delete post"}
             </button>
           </div>
+          {item.status !== "RETURNED" && (
+            <div className="mt-4 rounded-2xl border border-wpu-black/10 bg-wpu-gray-light/70 p-4">
+              <p className="text-sm font-semibold text-wpu-black">Status controls</p>
+              <p className="mt-1 text-sm text-wpu-black/65">
+                Keep the post state up to date so everyone sees the right availability.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {item.status !== "CLAIMED" && (
+                  <button
+                    type="button"
+                    onClick={() => handleStatusUpdate("CLAIMED")}
+                    disabled={statusUpdating}
+                    className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+                  >
+                    Mark as {ITEM_STATUS_LABELS.CLAIMED}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleStatusUpdate("RETURNED")}
+                  disabled={statusUpdating}
+                  className="rounded-lg bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                >
+                  Mark as {ITEM_STATUS_LABELS.RETURNED}
+                </button>
+              </div>
+            </div>
+          )}
           {isFound && item.claimRequests.length > 0 && (
             <div className="mt-6">
               <h3 className="font-medium text-wpu-black">Claim requests</h3>
@@ -297,11 +358,13 @@ export function ItemDetailClient({
           </div>
 
           {/* FOUND: Claim option only */}
-          {isFound && (item.status === "OPEN" || item.status === "PENDING") && (
+          {isFound && (
             <div className="rounded-xl border border-wpu-black/10 bg-white p-6">
               <h2 className="font-semibold text-wpu-black">I think this is mine</h2>
               <p className="mt-1 text-sm text-wpu-black-light">
-                Send a claim request. You can describe how you can verify ownership.
+                {item.status === "OPEN"
+                  ? "Send a claim request. You can describe how you can verify ownership."
+                  : `Claims are currently unavailable because this item is marked as ${currentStatusLabel.toLowerCase()}.`}
               </p>
               <form onSubmit={handleClaim} className="mt-4 space-y-3">
                 <textarea
@@ -309,14 +372,15 @@ export function ItemDetailClient({
                   onChange={(e) => setClaimMessage(e.target.value)}
                   placeholder="e.g. It has a red sticker, contains my ID card..."
                   rows={3}
-                  className="w-full rounded-lg border border-wpu-black/20 px-3 py-2 text-wpu-black placeholder-wpu-gray focus:border-wpu-orange focus:outline-none focus:ring-1 focus:ring-wpu-orange"
+                  disabled={item.status !== "OPEN"}
+                  className="w-full rounded-lg border border-wpu-black/20 px-3 py-2 text-wpu-black placeholder-wpu-gray focus:border-wpu-orange focus:outline-none focus:ring-1 focus:ring-wpu-orange disabled:cursor-not-allowed disabled:bg-wpu-gray-light/70"
                 />
                 {claimError && (
                   <p className="text-sm text-red-600">{claimError}</p>
                 )}
                 <button
                   type="submit"
-                  disabled={claiming}
+                  disabled={claiming || item.status !== "OPEN"}
                   className="rounded-lg bg-wpu-orange px-4 py-2 text-sm font-medium text-white hover:bg-wpu-orange-hover disabled:opacity-50"
                 >
                   {claiming ? "Sending…" : "Request to claim"}
@@ -326,7 +390,7 @@ export function ItemDetailClient({
           )}
 
           {/* LOST: Information options only (no claim) */}
-          {isLost && (item.status === "OPEN" || item.status === "PENDING") && (
+          {isLost && item.status !== "RETURNED" && (
             <div className="rounded-xl border border-wpu-black/10 bg-white p-6">
               <h2 className="font-semibold text-wpu-black">Have information about this item?</h2>
               <p className="mt-1 text-sm text-wpu-black-light">

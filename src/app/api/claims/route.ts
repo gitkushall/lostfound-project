@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotificationAndEmail } from "@/lib/notify";
 import { z } from "zod";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 const createSchema = z.object({
   itemId: z.string(),
@@ -12,8 +11,8 @@ const createSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getValidatedSessionUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -35,13 +34,13 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    if (item.postedByUserId === session.user.id) {
+    if (item.postedByUserId === user.id) {
       return NextResponse.json(
         { error: "You cannot claim your own post" },
         { status: 400 }
       );
     }
-    if (item.status !== "OPEN" && item.status !== "PENDING") {
+    if (item.status !== "OPEN") {
       return NextResponse.json(
         { error: "This item is no longer available for claims" },
         { status: 400 }
@@ -49,7 +48,7 @@ export async function POST(req: Request) {
     }
 
     const existing = await prisma.claimRequest.findFirst({
-      where: { itemId, requesterUserId: session.user.id, status: "PENDING" },
+      where: { itemId, requesterUserId: user.id, status: "PENDING" },
     });
     if (existing) {
       return NextResponse.json(
@@ -61,7 +60,7 @@ export async function POST(req: Request) {
     const claim = await prisma.claimRequest.create({
       data: {
         itemId,
-        requesterUserId: session.user.id,
+        requesterUserId: user.id,
         message: message ?? null,
         verificationAnswers: verificationAnswers
           ? JSON.stringify(verificationAnswers)
@@ -75,7 +74,7 @@ export async function POST(req: Request) {
 
     await prisma.itemPost.update({
       where: { id: itemId },
-      data: { status: "PENDING" },
+      data: { status: "CLAIM_PENDING" },
     });
 
     await createNotificationAndEmail(item.postedByUserId, "CLAIM_REQUEST", {

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotificationAndEmail } from "@/lib/notify";
 import { z } from "zod";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 const updateSchema = z.object({
   status: z.enum(["APPROVED", "DENIED"]),
@@ -13,8 +12,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getValidatedSessionUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -33,7 +32,7 @@ export async function PATCH(
       include: { item: true },
     });
     if (!claim) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (claim.item.postedByUserId !== session.user.id) {
+    if (claim.item.postedByUserId !== user.id) {
       return NextResponse.json({ error: "Only the poster can approve/deny" }, { status: 403 });
     }
     if (claim.status !== "PENDING") {
@@ -49,9 +48,13 @@ export async function PATCH(
     });
 
     if (parsed.data.status === "APPROVED") {
+      await prisma.claimRequest.updateMany({
+        where: { itemId: claim.itemId, id: { not: id }, status: "PENDING" },
+        data: { status: "DENIED" },
+      });
       await prisma.itemPost.update({
         where: { id: claim.itemId },
-        data: { status: "RETURNED" },
+        data: { status: "CLAIMED" },
       });
       await createNotificationAndEmail(claim.requesterUserId, "CLAIM_APPROVED", {
         claimId: id,
@@ -59,9 +62,12 @@ export async function PATCH(
         itemTitle: claim.item.title,
       });
     } else {
+      const otherPendingClaims = await prisma.claimRequest.count({
+        where: { itemId: claim.itemId, status: "PENDING" },
+      });
       await prisma.itemPost.update({
         where: { id: claim.itemId },
-        data: { status: "OPEN" },
+        data: { status: otherPendingClaims > 0 ? "CLAIM_PENDING" : "OPEN" },
       });
     }
 

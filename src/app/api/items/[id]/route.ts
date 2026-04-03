@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { getValidatedSessionUser } from "@/lib/session-user";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -11,7 +10,7 @@ const updateSchema = z.object({
   locationText: z.string().min(1).optional(),
   dateOccurred: z.string().optional(),
   photoUrl: z.string().optional(),
-  status: z.enum(["OPEN", "PENDING", "RETURNED", "CLOSED"]).optional(),
+  status: z.enum(["OPEN", "CLAIM_PENDING", "CLAIMED", "RETURNED"]).optional(),
 });
 
 export async function GET(
@@ -41,15 +40,15 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getValidatedSessionUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
     const { id } = await params;
     const item = await prisma.itemPost.findUnique({ where: { id } });
     if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (item.postedByUserId !== session.user.id) {
+    if (item.postedByUserId !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const body = await req.json();
@@ -79,15 +78,15 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getValidatedSessionUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
     const { id } = await params;
     const item = await prisma.itemPost.findUnique({ where: { id } });
     if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (item.postedByUserId !== session.user.id) {
+    if (item.postedByUserId !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     // Only the post owner can delete; allowed for both LOST and FOUND, any status.

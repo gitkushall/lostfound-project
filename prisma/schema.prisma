@@ -41,7 +41,7 @@ model ItemPost {
   locationText   String
   dateOccurred   DateTime
   photoUrl       String?
-  status         String   @default("OPEN")
+  status         String   @default("OPEN") // OPEN | CLAIM_PENDING | CLAIMED | RETURNED
   postedByUserId String
   createdAt      DateTime @default(now())
 
