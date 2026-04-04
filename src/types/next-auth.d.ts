@@ -23,6 +23,7 @@ declare module "next-auth/jwt" {
     email?: string;
     name?: string;
     role?: string;
+    picture?: string;
     invalid?: boolean;
   }
 }

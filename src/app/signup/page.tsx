@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getProviders, signIn } from "next-auth/react";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -11,6 +12,17 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<Record<string, string[]> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+
+  useEffect(() => {
+    getProviders()
+      .then((providers) => {
+        setGoogleEnabled(Boolean(providers?.google));
+      })
+      .catch(() => {
+        setGoogleEnabled(false);
+      });
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,6 +68,25 @@ export default function SignupPage() {
           <h1 className="text-2xl font-bold text-slate-900">Create account</h1>
           <p className="mt-1 text-sm text-slate-500">LostFound — Campus Lost & Found</p>
         </div>
+        {googleEnabled ? (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => void signIn("google", { callbackUrl: "/" })}
+              className="flex min-h-[44px] w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-medium text-slate-900 hover:bg-slate-50"
+            >
+              <span className="text-base">G</span>
+              Continue with Google
+            </button>
+          </div>
+        ) : null}
+        {googleEnabled ? (
+          <div className="mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.12em] text-slate-400">
+            <span className="h-px flex-1 bg-slate-200" />
+            <span>or</span>
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+        ) : null}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-slate-700">

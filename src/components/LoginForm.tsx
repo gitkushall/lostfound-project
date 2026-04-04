@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { getProviders, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export function LoginForm() {
@@ -15,6 +15,17 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(registered ? "Account created. Please log in." : null);
   const [loading, setLoading] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+
+  useEffect(() => {
+    getProviders()
+      .then((providers) => {
+        setGoogleEnabled(Boolean(providers?.google));
+      })
+      .catch(() => {
+        setGoogleEnabled(false);
+      });
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,6 +62,25 @@ export function LoginForm() {
           <p className="font-medium">{successMessage}</p>
         </div>
       )}
+      {googleEnabled ? (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => void signIn("google", { callbackUrl })}
+            className="flex min-h-[44px] w-full items-center justify-center gap-3 rounded-lg border border-wpu-black/15 bg-white px-4 py-2.5 font-medium text-wpu-black hover:bg-wpu-gray-light"
+          >
+            <span className="text-base">G</span>
+            Continue with Google
+          </button>
+        </div>
+      ) : null}
+      {googleEnabled ? (
+        <div className="mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.12em] text-wpu-black/35">
+          <span className="h-px flex-1 bg-wpu-black/10" />
+          <span>or</span>
+          <span className="h-px flex-1 bg-wpu-black/10" />
+        </div>
+      ) : null}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-wpu-black">
